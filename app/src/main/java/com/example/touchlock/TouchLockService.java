@@ -57,7 +57,7 @@ public class TouchLockService extends Service {
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Разблокировка");
-        builder.setMessage("Введите пароль 2468:");
+        builder.setMessage("Введите пароль:");
 
         final EditText input = new EditText(this);
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);

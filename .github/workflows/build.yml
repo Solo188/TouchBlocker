@@ -21,19 +21,20 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Setup Gradle
-        # Эта команда генерирует gradlew прямо на сервере GitHub
-        run: gradle wrapper
+      - name: Setup Gradle Wrapper
+        # Мы принудительно используем версию 7.5, чтобы избежать ошибок Gradle 9+
+        run: gradle wrapper --gradle-version 7.5
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        # Сборка дебаг-версии APK
-        run: ./gradlew assembleDebug
+        # Сборка APK. Параметр --stacktrace поможет увидеть детали, если что-то пойдет не так
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: touch-lock-app
           path: app/build/outputs/apk/debug/app-debug.apk
+          

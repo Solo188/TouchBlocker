@@ -4,7 +4,6 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // Используем более стабильную версию плагина
         classpath 'com.android.tools.build:gradle:7.4.2'
     }
 }
@@ -14,8 +13,4 @@ allprojects {
         google()
         mavenCentral()
     }
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
 }

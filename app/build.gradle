@@ -1,8 +1,11 @@
-plugins { id 'com.android.application' }
+plugins {
+    id 'com.android.application'
+}
 
 android {
     namespace 'com.example.touchlock'
     compileSdk 33
+
     defaultConfig {
         applicationId "com.example.touchlock"
         minSdk 26
@@ -10,4 +13,22 @@ android {
         versionCode 1
         versionName "1.0"
     }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+    
+    // Это поможет избежать ошибок с дублированием ресурсов
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Базовые библиотеки Android
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
 }

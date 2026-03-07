@@ -1,0 +1,13 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.example.touchlock'
+    compileSdk 33
+    defaultConfig {
+        applicationId "com.example.touchlock"
+        minSdk 26
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+    }
+}

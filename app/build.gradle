@@ -15,7 +15,12 @@ android {
     }
 }
 
+repositories {
+    google()
+    mavenCentral()
+}
+
 dependencies {
-    // Используем только самые необходимые библиотеки
+    // Минимум библиотек, чтобы не было конфликтов
     implementation 'androidx.appcompat:appcompat:1.6.1'
 }

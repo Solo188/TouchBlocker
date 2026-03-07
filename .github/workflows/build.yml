@@ -1,36 +1,28 @@
 name: Android CI
 
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
 
-      - name: Setup Gradle Wrapper
-        # Мы принудительно используем версию 7.5, чтобы избежать ошибок Gradle 9+
-        run: gradle wrapper --gradle-version 7.5
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Setup Gradle
+        # Это официальный инструмент, который сам скачает нужную версию Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 7.5
 
       - name: Build with Gradle
-        # Сборка APK. Параметр --stacktrace поможет увидеть детали, если что-то пойдет не так
-        run: ./gradlew assembleDebug --stacktrace
+        # Мы вызываем gradle напрямую, минуя обертку gradlew, которой у нас нет
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

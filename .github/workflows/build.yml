@@ -15,13 +15,13 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Gradle
-        # Это официальный инструмент, который сам скачает нужную версию Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 7.5
+          # Отключаем кэш, чтобы избежать старых ошибок
+          cache-disabled: true
 
       - name: Build with Gradle
-        # Мы вызываем gradle напрямую, минуя обертку gradlew, которой у нас нет
         run: gradle assembleDebug --stacktrace
 
       - name: Upload APK

